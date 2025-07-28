@@ -157,26 +157,42 @@ const PomodoroTimer = () => {
   }, [isRunning, timeLeft, handleTimerComplete]);
 
   const resetTimerState = () => {
-    setIsRunning(false);
-    setIsPaused(false);
-    setIsCompleted(false);
-    setShowReminder(false);
-    stopBlinking();
-    if (reminderTimeoutRef.current) clearTimeout(reminderTimeoutRef.current);
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  setIsRunning(false);
+  setIsPaused(false);
+  setIsCompleted(false);
+  setShowReminder(false);
+  stopBlinking();
+
+  if (reminderTimeoutRef.current) {
+    clearTimeout(reminderTimeoutRef.current);
+    reminderTimeoutRef.current = null;
   }
+  if (intervalRef.current) {
+    clearInterval(intervalRef.current);
+    intervalRef.current = null;
+  }
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+};
 
   const handlePlay = () => {
-    unlockAudio(); // <<< unlock audio on first Play click
+  unlockAudio();
 
-    if (isCompleted || timeLeft === 0) {
-      resetTimerState();
-      setTimeLeft(minutes * 60);
-    }
-    setIsRunning(true);
-    setIsPaused(false);
-  };
+  // stop any reminder + blinking immediately
+  if (reminderTimeoutRef.current) {
+    clearTimeout(reminderTimeoutRef.current);
+    reminderTimeoutRef.current = null;
+  }
+  stopBlinking();
+  setShowReminder(false);
+
+  if (isCompleted || timeLeft === 0) {
+    resetTimerState();
+    setTimeLeft(minutes * 60);
+  }
+
+  setIsRunning(true);
+  setIsPaused(false);
+};
 
   const handlePause = () => {
     setIsRunning(false);
@@ -188,23 +204,38 @@ const PomodoroTimer = () => {
     setTimeLeft(minutes * 60);
   };
 
-  const handleMinutesChange = (e) => {
-    const newMinutes = parseInt(e.target.value, 10) || 1;
-    setMinutes(newMinutes);
-    if (!isRunning && !isPaused) {
-      setTimeLeft(newMinutes * 60);
-    }
+ const handleMinutesChange = (e) => {
+  const newMinutes = parseInt(e.target.value, 10) || 1;
+  setMinutes(newMinutes);
+  if (!isRunning && !isPaused) {
+    setTimeLeft(newMinutes * 60);
+  }
+};
+
+// CLEANUP on unmount
+useEffect(() => {
+  return () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (reminderTimeoutRef.current) clearTimeout(reminderTimeoutRef.current);
+    stopBlinking();
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   };
+}, [stopBlinking]);
 
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (reminderTimeoutRef.current) clearTimeout(reminderTimeoutRef.current);
-      stopBlinking();
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-    };
-  }, [stopBlinking]);
+// NEW: whenever the timer starts running, stop blinking & hide reminder
+useEffect(() => {
+  if (isRunning) {
+    stopBlinking();
+    setShowReminder(false);
+  }
+}, [isRunning, stopBlinking]);
 
+const totalSeconds = minutes * 60;
+const timerAngle = totalSeconds > 0 ? (timeLeft / totalSeconds) * 360 : 0;
+
+const timerStyle = {
+  background: `conic-gradient(from -90deg, #a5b4fc ${timerAngle}deg, transparent 0deg)`,
+};
   const totalSeconds = minutes * 60;
   const timerAngle = totalSeconds > 0 ? (timeLeft / totalSeconds) * 360 : 0;
 
