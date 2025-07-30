@@ -86,12 +86,14 @@ const PomodoroTimer = () => {
     }, 500);
   }, []);
 
-  const stopBlinking = useCallback(() => {
-  if (blinkIntervalRef.current) {           // ← clear FIRST
+ const stopBlinking = useCallback(() => {
+  /* 1. kill the toggle loop */
+  if (blinkIntervalRef.current !== null) {
     clearInterval(blinkIntervalRef.current);
     blinkIntervalRef.current = null;
   }
-  setIsBlinking(false);                     // ← flag LAST
+  /* 2. ensure the ring is OFF */
+  setIsBlinking(false);
 }, []);
 const handleStop = () => {
   resetTimerState();          // existing
@@ -140,15 +142,29 @@ const handleStop = () => {
 
   /* ---------- Controls ---------- */
   const handlePlay = () => {
-    unlockAudio();
-    if (reminderTimeoutRef.current) { clearTimeout(reminderTimeoutRef.current); reminderTimeoutRef.current = null; }
-    stopBlinking(); setShowReminder(false);
+  unlockAudio();
 
-    if (isCompleted || timeLeft === 0) { resetTimerState(); setTimeLeft(minutes * 60); }
-    setIsRunning(true); setIsPaused(false);
-  };
+  /* stop reminder + blink immediately */
+  if (reminderTimeoutRef.current) {
+    clearTimeout(reminderTimeoutRef.current);
+    reminderTimeoutRef.current = null;
+  }
+  stopBlinking();
+  setShowReminder(false);
+
+  if (isCompleted || timeLeft === 0) {
+    resetTimerState();
+    setTimeLeft(minutes * 60);
+  }
+  setIsRunning(true);
+  setIsPaused(false);
+};
   const handlePause = () => { setIsRunning(false); setIsPaused(true); };
-  const handleStop  = () => { resetTimerState(); setTimeLeft(minutes * 60); };
+  const handleStop = () => {
+  resetTimerState();
+  stopBlinking();               // <‑‑ add this call
+  setTimeLeft(minutes * 60);
+};
 
   const handleMinutesChange = e => {
     const newMin = parseInt(e.target.value,10) || 1;
