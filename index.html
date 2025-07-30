@@ -87,12 +87,12 @@ const PomodoroTimer = () => {
   }, []);
 
   const stopBlinking = useCallback(() => {
-    setIsBlinking(false);
-    if (blinkIntervalRef.current) {
-      clearInterval(blinkIntervalRef.current);
-      blinkIntervalRef.current = null;
-    }
-  }, []);
+  if (blinkIntervalRef.current) {           // ← clear FIRST
+    clearInterval(blinkIntervalRef.current);
+    blinkIntervalRef.current = null;
+  }
+  setIsBlinking(false);                     // ← flag LAST
+}, []);
 
   /* ---------- Timer complete ---------- */
   const handleTimerComplete = useCallback(() => {
