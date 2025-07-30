@@ -93,7 +93,11 @@ const PomodoroTimer = () => {
   }
   setIsBlinking(false);                     // ← flag LAST
 }, []);
-
+const handleStop = () => {
+  resetTimerState();          // existing
+  stopBlinking();             // << add
+  setTimeLeft(minutes * 60);
+};
   /* ---------- Timer complete ---------- */
   const handleTimerComplete = useCallback(() => {
     setIsRunning(false);
