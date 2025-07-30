@@ -25,27 +25,26 @@
     <script type="text/babel">
 const { useState, useEffect, useRef, useCallback } = React;
 
-// --- Icon Components ---
+/* ---------- Icon Components ---------- */
 const PlayIcon = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
     <path d="M8 5v14l11-7z" />
   </svg>
 );
-
 const PauseIcon = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
     <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
   </svg>
 );
-
 const StopIcon = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
     <path d="M6 6h12v12H6z" />
   </svg>
 );
 
-// --- Pomodoro Timer Component ---
+/* ---------- Pomodoro Component ---------- */
 const PomodoroTimer = () => {
+  /* --- State --- */
   const [minutes, setMinutes] = useState(25);
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [isRunning, setIsRunning] = useState(false);
@@ -54,12 +53,13 @@ const PomodoroTimer = () => {
   const [isBlinking, setIsBlinking] = useState(false);
   const [showReminder, setShowReminder] = useState(false);
 
-  const intervalRef = useRef(null);
-  const reminderTimeoutRef = useRef(null);
-  const blinkIntervalRef = useRef(null);
-  const audioUnlockedRef = useRef(false);
+  /* --- Refs --- */
+  const intervalRef         = useRef(null);
+  const reminderTimeoutRef  = useRef(null);
+  const blinkIntervalRef    = useRef(null);
+  const audioUnlockedRef    = useRef(false);
 
-  // ----- AUDIO -----
+  /* ---------- Audio helpers ---------- */
   const unlockAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
     ['sndAwesome', 'sndReady'].forEach(id => {
@@ -71,33 +71,14 @@ const PomodoroTimer = () => {
 
   const playAwesome = useCallback(() => {
     const a = document.getElementById('sndAwesome');
-    if (a) {
-      a.currentTime = 0;
-      a.play().catch(() => {});
-    }
+    if (a) { a.currentTime = 0; a.play().catch(()=>{}); }
   }, []);
-
   const playReady = useCallback(() => {
     const a = document.getElementById('sndReady');
-    if (a) {
-      a.currentTime = 0;
-      a.play().catch(() => {});
-    }
+    if (a) { a.currentTime = 0; a.play().catch(()=>{}); }
   }, []);
 
-  // (You can delete speak if you no longer need TTS, keeping for reference)
-  const speak = useCallback((text) => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9;
-      utterance.pitch = 1;
-      window.speechSynthesis.speak(utterance);
-    } else {
-      console.warn("Text-to-speech is not supported in this browser.");
-    }
-  }, []);
-
+  /* ---------- Blink helpers ---------- */
   const startBlinking = useCallback(() => {
     setIsBlinking(true);
     blinkIntervalRef.current = window.setInterval(() => {
@@ -113,14 +94,12 @@ const PomodoroTimer = () => {
     }
   }, []);
 
+  /* ---------- Timer complete ---------- */
   const handleTimerComplete = useCallback(() => {
     setIsRunning(false);
     setIsCompleted(true);
-
-    // play "You're Awesome!"
     playAwesome();
 
-    // after 60s, blink + "Ready?"
     reminderTimeoutRef.current = window.setTimeout(() => {
       setShowReminder(true);
       startBlinking();
@@ -128,211 +107,134 @@ const PomodoroTimer = () => {
     }, 60000);
   }, [playAwesome, playReady, startBlinking]);
 
+  /* ---------- Tick cycle ---------- */
   useEffect(() => {
     if (isRunning && timeLeft > 0) {
       intervalRef.current = window.setInterval(() => {
         setTimeLeft(prev => {
-          if (prev <= 1) {
-            handleTimerComplete();
-            return 0;
-          }
+          if (prev <= 1) { handleTimerComplete(); return 0; }
           return prev - 1;
         });
       }, 1000);
     } else if (!isRunning && intervalRef.current) {
       clearInterval(intervalRef.current);
     }
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [isRunning, timeLeft, handleTimerComplete]);
 
+  /* ---------- Utility: reset ---------- */
   const resetTimerState = () => {
-  setIsRunning(false);
-  setIsPaused(false);
-  setIsCompleted(false);
-  setShowReminder(false);
-  stopBlinking();
-
-  if (reminderTimeoutRef.current) {
-    clearTimeout(reminderTimeoutRef.current);
-    reminderTimeoutRef.current = null;
-  }
-  if (intervalRef.current) {
-    clearInterval(intervalRef.current);
-    intervalRef.current = null;
-  }
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-};
-
-  const handlePlay = () => {
-  unlockAudio();
-
-  // stop any reminder + blinking immediately
-  if (reminderTimeoutRef.current) {
-    clearTimeout(reminderTimeoutRef.current);
-    reminderTimeoutRef.current = null;
-  }
-  stopBlinking();
-  setShowReminder(false);
-
-  if (isCompleted || timeLeft === 0) {
-    resetTimerState();
-    setTimeLeft(minutes * 60);
-  }
-
-  setIsRunning(true);
-  setIsPaused(false);
-};
-
-  const handlePause = () => {
     setIsRunning(false);
-    setIsPaused(true);
-  };
-
-  const handleStop = () => {
-    resetTimerState();
-    setTimeLeft(minutes * 60);
-  };
-
- const handleMinutesChange = (e) => {
-  const newMinutes = parseInt(e.target.value, 10) || 1;
-  setMinutes(newMinutes);
-  if (!isRunning && !isPaused) {
-    setTimeLeft(newMinutes * 60);
-  }
-};
-
-// CLEANUP on unmount
-useEffect(() => {
-  return () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    if (reminderTimeoutRef.current) clearTimeout(reminderTimeoutRef.current);
-    stopBlinking();
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-  };
-}, [stopBlinking]);
-
-// NEW: whenever the timer starts running, stop blinking & hide reminder
-useEffect(() => {
-  if (isRunning) {
-    stopBlinking();
+    setIsPaused(false);
+    setIsCompleted(false);
     setShowReminder(false);
-  }
-}, [isRunning, stopBlinking]);
+    stopBlinking();
 
-const totalSeconds = minutes * 60;
-const timerAngle = totalSeconds > 0 ? (timeLeft / totalSeconds) * 360 : 0;
-
-const timerStyle = {
-  background: `conic-gradient(from -90deg, #a5b4fc ${timerAngle}deg, transparent 0deg)`,
-};
-
-
-  const timerStyle = {
-    background: `conic-gradient(from -90deg, #a5b4fc ${timerAngle}deg, transparent 0deg)`,
+    if (reminderTimeoutRef.current) { clearTimeout(reminderTimeoutRef.current); reminderTimeoutRef.current = null; }
+    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
   };
 
+  /* ---------- Controls ---------- */
+  const handlePlay = () => {
+    unlockAudio();
+    if (reminderTimeoutRef.current) { clearTimeout(reminderTimeoutRef.current); reminderTimeoutRef.current = null; }
+    stopBlinking(); setShowReminder(false);
+
+    if (isCompleted || timeLeft === 0) { resetTimerState(); setTimeLeft(minutes * 60); }
+    setIsRunning(true); setIsPaused(false);
+  };
+  const handlePause = () => { setIsRunning(false); setIsPaused(true); };
+  const handleStop  = () => { resetTimerState(); setTimeLeft(minutes * 60); };
+
+  const handleMinutesChange = e => {
+    const newMin = parseInt(e.target.value,10) || 1;
+    setMinutes(newMin);
+    if (!isRunning && !isPaused) setTimeLeft(newMin * 60);
+  };
+
+  /* ---------- Effects: startup / running ---------- */
+  useEffect(() => { if (isRunning) { stopBlinking(); setShowReminder(false); } }, [isRunning, stopBlinking]);
+
+  /* ---------- Draw progress ---------- */
+  const totalSeconds = minutes * 60;
+  const timerAngle   = totalSeconds > 0 ? (timeLeft / totalSeconds) * 360 : 0;
+  const timerStyle   = { background: `conic-gradient(from -90deg, #a5b4fc ${timerAngle}deg, transparent 0deg)` };
+
+  /* ---------- Render ---------- */
   return (
-    <div className={`bg-white/60 backdrop-blur-xl rounded-3xl shadow-lg p-8 w-full max-w-md transition-all duration-500 ${
-        isBlinking ? 'ring-4 ring-red-300 shadow-red-200' : 'ring-4 ring-transparent'
-      }`}>
-        
-        <div className="mb-8 text-center">
-          <label htmlFor="duration-input" className="block text-sm font-medium text-gray-600 mb-2">
-            Focus Duration (minutes)
-          </label>
-          <input
-            id="duration-input"
-            type="number"
-            min="1"
-            max="120"
-            value={minutes}
-            onChange={handleMinutesChange}
-            disabled={isRunning || isPaused}
-            className="w-24 px-3 py-2 text-center text-lg font-semibold bg-white border-2 border-purple-200 rounded-xl focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
-          />
-        </div>
+    <div className={`bg-white/60 backdrop-blur-xl rounded-3xl shadow-lg p-8 w-full max-w-md transition-all ${
+      isBlinking ? 'ring-4 ring-red-300 shadow-red-200' : 'ring-4 ring-transparent'
+    }`}>
+      {/* Duration input */}
+      <div className="mb-8 text-center">
+        <label htmlFor="duration-input" className="block text-sm font-medium text-gray-600 mb-2">
+          Focus Duration (minutes)
+        </label>
+        <input
+          id="duration-input" type="number" min="1" max="120" value={minutes}
+          onChange={handleMinutesChange} disabled={isRunning || isPaused}
+          className="w-24 px-3 py-2 text-center text-lg font-semibold bg-white border-2 border-purple-200 rounded-xl
+                     focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300
+                     disabled:bg-gray-100 disabled:cursor-not-allowed"
+        />
+      </div>
 
-        <div className="text-center mb-8">
-          <div className="relative w-48 h-48 sm:w-56 sm:h-56 mx-auto mb-4 bg-gray-200/70 rounded-2xl p-2 shadow-inner">
-            <div
-              className="w-full h-full rounded-[10px] transition-all duration-1000 ease-linear"
-              style={timerStyle}
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className={`w-5 h-5 rounded-full transition-all duration-300 shadow-md ${
-                isCompleted ? 'bg-emerald-400 animate-pulse' : 
-                isBlinking ? 'bg-red-500 animate-bounce' : 
-                isRunning ? 'bg-purple-400 animate-pulse' : 'bg-gray-400'
-              }`} />
-            </div>
-          </div>
-          
-          <div className="h-6">
-          {isCompleted && !showReminder && (
-            <p className="text-emerald-600 font-medium text-lg">Awesome! Take a break. 🎉</p>
-          )}
-          {showReminder && (
-            <p className="text-red-600 font-medium animate-pulse text-lg">Ready for another round?</p>
-          )}
+      {/* Timer circle */}
+      <div className="text-center mb-8">
+        <div className="relative w-48 h-48 sm:w-56 sm:h-56 mx-auto mb-4 bg-gray-200/70 rounded-2xl p-2 shadow-inner">
+          <div className="w-full h-full rounded-[10px] transition-all duration-1000 ease-linear" style={timerStyle} />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className={`w-5 h-5 rounded-full transition-all shadow-md ${
+              isCompleted ? 'bg-emerald-400 animate-pulse' :
+              isBlinking  ? 'bg-red-500 animate-bounce'   :
+              isRunning   ? 'bg-purple-400 animate-pulse' : 'bg-gray-400'
+            }`} />
           </div>
         </div>
-
-        <div className="flex justify-center gap-4 sm:gap-6">
-          <button
-            onClick={handlePlay}
-            disabled={isRunning}
-            aria-label="Play timer"
-            className="flex items-center justify-center w-16 h-16 bg-emerald-200 text-emerald-700 hover:bg-emerald-300 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed rounded-full transition-all duration-200 shadow-md hover:shadow-lg active:scale-95"
-          >
-            <PlayIcon className="w-8 h-8 ml-1" />
-          </button>
-
-          <button
-            onClick={handlePause}
-            disabled={!isRunning}
-            aria-label="Pause timer"
-            className="flex items-center justify-center w-16 h-16 bg-amber-200 text-amber-700 hover:bg-amber-300 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed rounded-full transition-all duration-200 shadow-md hover:shadow-lg active:scale-95"
-          >
-            <PauseIcon className="w-8 h-8" />
-          </button>
-
-          <button
-            onClick={handleStop}
-            aria-label="Stop and reset timer"
-            className="flex items-center justify-center w-16 h-16 bg-rose-200 text-rose-700 hover:bg-rose-300 rounded-full transition-all duration-200 shadow-md hover:shadow-lg active:scale-95"
-          >
-            <StopIcon className="w-7 h-7" />
-          </button>
-        </div>
-
-        <div className="flex justify-center gap-4 sm:gap-6 mt-2">
-          <span className="w-16 text-center text-xs text-gray-500 font-medium">Play</span>
-          <span className="w-16 text-center text-xs text-gray-500 font-medium">Pause</span>
-          <span className="w-16 text-center text-xs text-gray-500 font-medium">Stop</span>
+        <div className="h-6">
+          {isCompleted && !showReminder && <p className="text-emerald-600 font-medium text-lg">Awesome! Take a break. 🎉</p>}
+          {showReminder               && <p className="text-red-600 font-medium animate-pulse text-lg">Ready for another round?</p>}
         </div>
       </div>
+
+      {/* Controls */}
+      <div className="flex justify-center gap-4 sm:gap-6">
+        <button onClick={handlePlay} disabled={isRunning} aria-label="Play"
+          className="flex items-center justify-center w-16 h-16 bg-emerald-200 text-emerald-700 hover:bg-emerald-300
+                     disabled:bg-gray-200 disabled:text-gray-400 rounded-full shadow-md hover:shadow-lg active:scale-95">
+          <PlayIcon className="w-8 h-8 ml-1" />
+        </button>
+        <button onClick={handlePause} disabled={!isRunning} aria-label="Pause"
+          className="flex items-center justify-center w-16 h-16 bg-amber-200 text-amber-700 hover:bg-amber-300
+                     disabled:bg-gray-200 disabled:text-gray-400 rounded-full shadow-md hover:shadow-lg active:scale-95">
+          <PauseIcon className="w-8 h-8" />
+        </button>
+        <button onClick={handleStop} aria-label="Stop"
+          className="flex items-center justify-center w-16 h-16 bg-rose-200 text-rose-700 hover:bg-rose-300
+                     rounded-full shadow-md hover:shadow-lg active:scale-95">
+          <StopIcon className="w-7 h-7" />
+        </button>
+      </div>
+
+      <div className="flex justify-center gap-4 sm:gap-6 mt-2 text-xs text-gray-500 font-medium">
+        <span className="w-16 text-center">Play</span>
+        <span className="w-16 text-center">Pause</span>
+        <span className="w-16 text-center">Stop</span>
+      </div>
+    </div>
   );
 };
 
-// --- Main App Component ---
-const App = () => {
-  return (
-    <main className="min-h-screen bg-rose-50 flex items-center justify-center p-4 font-['Inter',_sans-serif]">
-      <PomodoroTimer />
-    </main>
-  );
-};
+/* ---------- App shell ---------- */
+const App = () => (
+  <main className="min-h-screen bg-rose-50 flex items-center justify-center p-4 font-['Inter',_sans-serif]">
+    <PomodoroTimer />
+  </main>
+);
 
-// --- Render the App to the page ---
-const rootElement = document.getElementById('root');
-const root = ReactDOM.createRoot(rootElement);
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
+/* ---------- Render ---------- */
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode><App /></React.StrictMode>
 );
 </script>
 
