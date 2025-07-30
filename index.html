@@ -87,17 +87,15 @@ const PomodoroTimer = () => {
   }, []);
 
  const stopBlinking = useCallback(() => {
-  /* 1. kill the toggle loop */
-  if (blinkIntervalRef.current !== null) {
+  setIsBlinking(false);                    // 1) update the flag first
+  if (blinkIntervalRef.current) {          // 2) then clear the toggle loop
     clearInterval(blinkIntervalRef.current);
     blinkIntervalRef.current = null;
   }
-  /* 2. ensure the ring is OFF */
-  setIsBlinking(false);
 }, []);
 const handleStop = () => {
-  resetTimerState();          // existing
-  stopBlinking();             // << add
+  resetTimerState();     // clears timers & state
+  stopBlinking();        // << make sure blinking stops NOW
   setTimeLeft(minutes * 60);
 };
   /* ---------- Timer complete ---------- */
@@ -160,11 +158,6 @@ const handleStop = () => {
   setIsPaused(false);
 };
   const handlePause = () => { setIsRunning(false); setIsPaused(true); };
-  const handleStop = () => {
-  resetTimerState();
-  stopBlinking();               // <‑‑ add this call
-  setTimeLeft(minutes * 60);
-};
 
   const handleMinutesChange = e => {
     const newMin = parseInt(e.target.value,10) || 1;
